@@ -1,0 +1,6 @@
+deck { draw } > Queue? ||
+game { players, order, deck, last_card }
+player { player_deck }
+
+COLOR > SPECIAL > (+2 SKIP, SKIP)
+SPECIAL > SKIP

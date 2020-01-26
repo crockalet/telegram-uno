@@ -2,7 +2,7 @@ from .errors import ColorNotSet, BadCard
 
 class Card:
     def __repr__(self):
-        return "%s: %s" % (self.__class__.__name__, self.__str__())
+        return f"{self.__class__.__name__}: {str(self)}"
         # return "%s: %s %s" % (self.__class__.__name__, self.__str__(), str(id(self)))
 
     def compare(self, card):
@@ -19,7 +19,7 @@ class ColorCard(Card):
     def __init__(self, color, number):
         super().__init__()
         self.color = color
-        self.number = number
+        self.number = int(number)
 
     def compare(self, card):
         super().compare(card)
@@ -29,7 +29,7 @@ class ColorCard(Card):
         elif not matched_colors: raise BadCard
 
     def __str__(self):
-        return "%s_%s" % (self.color, str(self.number))
+        return f"{self.color} {self.number}"
 
     def __eq__(self, other):
         if not isinstance(other, ColorCard): return False
@@ -55,7 +55,7 @@ class SpecialCard(Card):
         elif not matched_colors: raise BadCard
 
     def __str__(self):
-        return "%s_%s" % (self.color, self.special)
+        return f"{self.color} {self.special}"
 
     def __eq__(self, other):
         if not isinstance(other, SpecialCard): return False
@@ -82,7 +82,11 @@ class WildCard(Card):
         elif not self.next_color == card.color: raise BadCard
 
     def __str__(self):
-        return "%s, NextColor: %s" % (self.special, self.next_color) if self.next_color is not None else self.special
+        return f"{self.special}"
+
+    def __repr__(self):
+        next_color = self.next_color if self.next_color is not None else "NOT SET"
+        return f"WildCard: {self.special}, next_color = {next_color}"
 
     def __eq__(self, other):
         if not isinstance(other, WildCard): return False
@@ -93,10 +97,10 @@ class WildCard(Card):
 
 CARDS = []
 
-COLORS = ["RED", "GREEN", "BLUE", "YELLOW"]
+COLORS = ["red", "green", "blue", "yellow"]
 NUMBERS = range(0, 10)
-SPECIALS = ["PLUS_2", "REVERSE", "SKIP"]
-WILDCARD = ["PLUS_4", "CHANGE_COLOR"]
+SPECIALS = ["+2", "reverse", "skip"]
+WILDCARD = ["+4", "change color"]
 
 for color in COLORS:
     for number in NUMBERS:

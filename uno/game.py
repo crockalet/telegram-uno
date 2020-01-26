@@ -69,7 +69,6 @@ class UnoGame:
         """        
         if not self.started: raise GameNotStarted
         if not player == self._current_player: raise WrongPlayer
-        if not player.deck.has(card): raise BadCard
         
         last_card = self.last_card
         if isinstance(card, (ColorCard, SpecialCard)):
@@ -82,15 +81,15 @@ class UnoGame:
         self.history.append(card)
 
         if isinstance(card, (SpecialCard, WildCard)):
-            if card.special.startswith("PLUS_"):
+            if card.special.startswith("+"):
                 draw_amount = int(card.special.split("_", 1)[1])
                 cards = self.deck.distribute(draw_amount)
 
                 player = self._next_player()
                 player.deck.extend(cards)
-            elif card.special == "REVERSE":
+            elif card.special == "reverse":
                 self.players.reverse()
-            elif card.special == "SKIP":
+            elif card.special == "skip":
                 self._next_player()
 
         self._next_player()

@@ -1,3 +1,3 @@
 from .game import UnoGame
 
-__all__ = ["UnoGame", "errors", "test"]
+__all__ = ["UnoGame", "errors", "test", "card"]

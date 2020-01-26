@@ -3,10 +3,11 @@ import configparser
 
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, ParseMode, PhotoSize,
                     InlineQueryResultPhoto, InlineQueryResultArticle, InputTextMessageContent)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, CallbackQueryHandler, 
-                        InlineQueryHandler)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, 
+                        InlineQueryHandler, RegexHandler)
 
 import uno
+from uno.card import ColorCard, SpecialCard, WildCard
 from uno_telegram import (UnoTelegramGame,UnoTelegramPlayer, GameNotFound, PlayerNotFound,
                             PlayerAlreadyInGame)
 
@@ -16,7 +17,6 @@ config.read('config.ini')
 API_TOKEN = config['bot']['API_TOKEN']
 
 # TODO: image link dict
-PLACEHOLDER_IMG = "https://i.imgur.com/LuR9Rw1.jpg"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -116,16 +116,36 @@ def start_game(update, context):
         game.start_game()
     except uno.errors.NotEnoughPlayers:
         return query.answer(text="❌ Not enough players!", show_alert=True)
-    text = game.start_text + "\n\n`[-- GAME STARTED --]`"
-    
-    message.edit_text(text, parse_mode=ParseMode.MARKDOWN)
-    caption = "%s" % game.last_card
-    cached_image('uno', 'placeholder.png', chat.send_photo,
-                caption=f"{game.last_card}, {game.current_player_text}", reply_markup=play_markup)
 
-def play(update, context):
+    text = f"{game.start_text}\n\n`[-- GAME STARTED --]`"
+    message.edit_text(text, parse_mode=ParseMode.MARKDOWN)
+
+    cached_image('uno', 'placeholder.png', chat.send_photo,
+                caption=str(game.last_card))
+    return chat.send_message(text=f"Your turn {game.current_player}.", parse_mode=ParseMode.MARKDOWN,
+                                reply_markup=play_markup)
+
+def render_cards(update, context):
     query = update.inline_query
     user = query.from_user
+
+    try:
+        player = UnoTelegramPlayer.get_player(context, user)
+        
+        game = player.game
+
+        if not game.started: raise PlayerNotFound
+    except PlayerNotFound:
+        return query.answer(results=[], switch_pm_text="❌ You don't seem to be in a game!",
+                            switch_pm_parameter="not_in_game", cache_time=0)
+
+    results = player.render_cards()
+    
+    return query.answer(results=results, cache_time=0, is_personal=True)
+
+def play(update, context):
+    user = update.effective_user
+    message = update.message
 
     try:
         player = UnoTelegramPlayer.get_player(context, user)
@@ -135,28 +155,25 @@ def play(update, context):
 
         if not game.started: raise PlayerNotFound
     except PlayerNotFound:
-        return query.answer(results=[], switch_pm_text="❌ You don't seem to be in a game!",
-                            switch_pm_parameter="not_in_game", cache_time=0)
+        return user.send_message(text="❌ You don't seem to be in a game!")
 
-    NOT_CURRENT_PLAYER = not user == game.current_player
-    default_message = InputTextMessageContent('A?')
+    if not message.chat == chat: return user.send_message(text=f"🚫 You're in a game in {chat.title}!")
+    if not player.is_current_player: return user.send_message(text="🚫 Not your turn!")
 
-    results = []
-    for card, amount in player.deck.view.items():
-        if NOT_CURRENT_PLAYER:
-            results.append(
-                InlineQueryResultPhoto(f"no_play_{card}", PLACEHOLDER_IMG, PLACEHOLDER_IMG, title=str(card),
-                                        description=f"You have {amount}.", input_message_content=default_message)
-            )
-        else:
-            results.append(
-                InlineQueryResultPhoto(f"play_{card}", PLACEHOLDER_IMG, PLACEHOLDER_IMG, title=str(card),
-                                        description=f"You have {amount}.", caption=str(card))
-            )
-    
-    return query.answer(results=results, cache_time=0, is_personal=True)
+    (_, color, number) = update.message.text.split(" ", 2)
+    card = ColorCard(color, number)
 
+    last_card = game.last_card
+    print(card, last_card)
+    try:
+        game.play(player, card)
+    except uno.errors.BadCard: return message.reply_markdown(quote=True, text="nob can't play dat")
 
+    text = f"{player} played {card} against {last_card}"
+
+    cached_image(str(card), 'placeholder.png', chat.send_photo, caption=text, parse_mode=ParseMode.MARKDOWN)    
+    return chat.send_message(text=f'Your turn {game.current_player}', parse_mode=ParseMode.MARKDOWN,
+                                reply_markup=play_markup)
 
 def stop(update, context):
     chat = update.effective_chat
@@ -179,13 +196,25 @@ if __name__ == "__main__":
     updater = Updater(API_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
+    # omit 'play'
+    chosen_card_filter = Filters.regex('^play (red|green|blue|yellow) \d$')
+    chosen_special_card_filter = Filters.regex('^play (red|green|blue|yellow) (\+2|skip|reverse)$')
+    chosen_wild_card_filter = Filters.regex('^play (\+4|change color)$')
+
     start_handler = CommandHandler('start', start)
     stop_handler = CommandHandler('stop', stop)
     join_handler = CallbackQueryHandler(join, pattern='join')
     start_game_handler = CallbackQueryHandler(start_game, pattern='start')
-    play_inline_handler = InlineQueryHandler(play, pattern='play')
+    play_inline_handler = InlineQueryHandler(render_cards, pattern='play')
+    chosen_card_handler = MessageHandler(chosen_card_filter, play)
+    # chosen_card_handler = ChosenInlineResultHandler(play)
+                            # )
+    # chosen_wild_card_handler = ChosenInlineResultHandler(play_wildcard,
+    #                                 pattern=)
 
+    dispatcher.add_handler(chosen_card_handler)
     dispatcher.add_handler(play_inline_handler)
+    # dispatcher.add_handler(chosen_wild_card_handler)
     dispatcher.add_handler(join_handler)
     dispatcher.add_handler(start_game_handler)
     dispatcher.add_handler(start_handler)

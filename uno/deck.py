@@ -68,14 +68,11 @@ class PlayerDeck:
     def len(self):
         return len(self._deck)
 
-    def has(self, card):
-        return card in self._deck
-
     def remove(self, card):
         try:
             self._deck.remove(card)
         except ValueError:
-            raise CardNotFound
+            raise CardNotFound(f"{card} not in {self._deck}")
 
 
 

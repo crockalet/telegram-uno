@@ -22,3 +22,16 @@ class GameNotStarted(Exception):
 
 class GameInProgress(Exception):
     pass
+
+# NOT ERRORS
+class DrawAndSkipPlayer(Exception):
+    def __init__(self, player, draw_amount):
+        self.player = player
+        self.draw_amount = draw_amount
+
+class SkipPlayer(Exception):
+    def __init__(self, player):
+        self.player = player
+
+class Reversed(Exception):
+    pass

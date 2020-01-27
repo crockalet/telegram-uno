@@ -82,7 +82,7 @@ class WildCard(Card):
         elif not self.next_color == card.color: raise BadCard
 
     def __str__(self):
-        return f"{self.special}"
+        return f"special {self.special}"
 
     def __repr__(self):
         next_color = self.next_color if self.next_color is not None else "NOT SET"

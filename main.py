@@ -160,11 +160,11 @@ def play(update, context):
     if not message.chat == chat: return user.send_message(text=f"🚫 You're in a game in {chat.title}!")
     if not player.is_current_player: return user.send_message(text="🚫 Not your turn!")
 
-    (_, color, number) = update.message.text.split(" ", 2)
+    (color, number) = update.message.text.split(" ", 2)
     card = ColorCard(color, number)
 
     last_card = game.last_card
-    print(card, last_card)
+
     try:
         game.play(player, card)
     except uno.errors.BadCard: return message.reply_markdown(quote=True, text="nob can't play dat")
@@ -174,6 +174,68 @@ def play(update, context):
     cached_image(str(card), 'placeholder.png', chat.send_photo, caption=text, parse_mode=ParseMode.MARKDOWN)    
     return chat.send_message(text=f'Your turn {game.current_player}', parse_mode=ParseMode.MARKDOWN,
                                 reply_markup=play_markup)
+
+def play_special(update, context):
+    user = update.effective_user
+    message = update.message
+
+    try:
+        player = UnoTelegramPlayer.get_player(context, user)
+        
+        game = player.game
+        chat = game.chat
+
+        if not game.started: raise PlayerNotFound
+    except PlayerNotFound:
+        return user.send_message(text="❌ You don't seem to be in a game!")
+
+    if not message.chat == chat: return user.send_message(text=f"🚫 You're in a game in {chat.title}!")
+    if not player.is_current_player: return user.send_message(text="🚫 Not your turn!")
+
+    (color, special) = update.message.text.split(" ", 2)
+    card = SpecialCard(color, special)
+
+    last_card = game.last_card
+
+    try:
+        try:
+            game.play(player, card)
+        except uno.errors.BadCard: return message.reply_markdown(quote=True, text="nob can't play dat")
+        finally:
+            text = f"{player} played {card} against {last_card}"
+
+            cached_image(str(card), 'placeholder.png', chat.send_photo, caption=text, parse_mode=ParseMode.MARKDOWN) 
+    except uno.errors.DrawAndSkipPlayer as skipped:
+        chat.send_message(text=f'{skipped.player} drew {skipped.draw_amount} cards.', parse_mode=ParseMode.MARKDOWN)
+    except uno.errors.SkipPlayer as skipped:
+        chat.send_message(text=f'{skipped.player} was skipped.', parse_mode=ParseMode.MARKDOWN)
+    except uno.errors.Reversed:
+        chat.send_message(text=f'Reversed!')
+        
+    return chat.send_message(text=f'Your turn {game.current_player}', parse_mode=ParseMode.MARKDOWN,
+                            reply_markup=play_markup)
+
+def draw(update, context):
+    user = update.effective_user
+    message = update.message
+
+    try:
+        player = UnoTelegramPlayer.get_player(context, user)
+        
+        game = player.game
+        chat = game.chat
+
+        if not game.started: raise PlayerNotFound
+    except PlayerNotFound:
+        return user.send_message(text="❌ You don't seem to be in a game!")
+
+    if not message.chat == chat: return user.send_message(text=f"🚫 You're in a game in {chat.title}!")
+    if not player.is_current_player: return user.send_message(text="🚫 Not your turn!")
+
+    game.draw_card(player)
+    chat.send_message(text=f'{player} drew a card!', parse_mode=ParseMode.MARKDOWN)
+    return chat.send_message(text=f'Your turn {game.current_player}', parse_mode=ParseMode.MARKDOWN,
+                            reply_markup=play_markup)
 
 def stop(update, context):
     chat = update.effective_chat
@@ -197,9 +259,9 @@ if __name__ == "__main__":
     dispatcher = updater.dispatcher
 
     # omit 'play'
-    chosen_card_filter = Filters.regex('^play (red|green|blue|yellow) \d$')
-    chosen_special_card_filter = Filters.regex('^play (red|green|blue|yellow) (\+2|skip|reverse)$')
-    chosen_wild_card_filter = Filters.regex('^play (\+4|change color)$')
+    chosen_card_filter = Filters.regex('^(red|green|blue|yellow) \d$')
+    chosen_special_card_filter = Filters.regex('^(red|green|blue|yellow) (\+2|skip|reverse)$')
+    chosen_wild_card_filter = Filters.regex('^special (\+4|change color)$')
 
     start_handler = CommandHandler('start', start)
     stop_handler = CommandHandler('stop', stop)
@@ -207,14 +269,17 @@ if __name__ == "__main__":
     start_game_handler = CallbackQueryHandler(start_game, pattern='start')
     play_inline_handler = InlineQueryHandler(render_cards, pattern='play')
     chosen_card_handler = MessageHandler(chosen_card_filter, play)
+    chosen_special_handler = MessageHandler(chosen_special_card_filter, play_special)
+    draw_card_handler = MessageHandler(Filters.regex('^draw$'), draw)
     # chosen_card_handler = ChosenInlineResultHandler(play)
                             # )
     # chosen_wild_card_handler = ChosenInlineResultHandler(play_wildcard,
     #                                 pattern=)
 
     dispatcher.add_handler(chosen_card_handler)
+    dispatcher.add_handler(chosen_special_handler)
+    dispatcher.add_handler(draw_card_handler)
     dispatcher.add_handler(play_inline_handler)
-    # dispatcher.add_handler(chosen_wild_card_handler)
     dispatcher.add_handler(join_handler)
     dispatcher.add_handler(start_game_handler)
     dispatcher.add_handler(start_handler)

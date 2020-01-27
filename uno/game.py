@@ -1,7 +1,8 @@
 from .deck import Deck, PlayerDeck
 from .card import ColorCard, SpecialCard, WildCard
 
-from .errors import NotEnoughPlayers, GameNotStarted, GameInProgress, BadCard, WrongPlayer
+from .errors import (NotEnoughPlayers, GameNotStarted, GameInProgress, BadCard, WrongPlayer,
+                        DrawAndSkipPlayer, SkipPlayer, Reversed)
 
 class UnoGame:
     """[summary]
@@ -80,19 +81,29 @@ class UnoGame:
         player.deck.remove(card)
         self.history.append(card)
 
-        if isinstance(card, (SpecialCard, WildCard)):
-            if card.special.startswith("+"):
-                draw_amount = int(card.special.split("_", 1)[1])
-                cards = self.deck.distribute(draw_amount)
+        try:
+            if isinstance(card, (SpecialCard, WildCard)):
+                if card.special.startswith("+"):
+                    draw_amount = int(card.special.split("", 1)[1])
+                    cards = self.deck.distribute(draw_amount)
 
-                player = self._next_player()
-                player.deck.extend(cards)
-            elif card.special == "reverse":
-                self.players.reverse()
-            elif card.special == "skip":
-                self._next_player()
+                    player = self._next_player()
+                    player.deck.extend(cards)
 
-        self._next_player()
+                    raise DrawAndSkipPlayer(player, draw_amount)
+                elif card.special == "reverse":
+                    self.players.reverse()
+                    raise Reversed
+                elif card.special == "skip":
+                    raise SkipPlayer(self._next_player())
+        finally:
+            self._next_player()
+
+    def draw_card(self, player):
+        if not self.started: raise GameNotStarted
+        if not player == self._current_player: raise WrongPlayer
+
+        player.deck.extend(self.deck.distribute(1))
 
     def add_player(self, player):
         """

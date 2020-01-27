@@ -114,7 +114,7 @@ class UnoTelegramPlayer:
 
         for card, amount in self.deck.view.items():
             id_ = f"card_{card}"
-            message_content = InputTextMessageContent(f"play {card}") if self.is_current_player else default_message_content
+            message_content = InputTextMessageContent(f"{card}") if self.is_current_player else default_message_content
             rendered_card = InlineQueryResultArticle(id_, f"{card}", message_content, thumb_url=card.url,
                                 description=f"you have: {amount}")
 

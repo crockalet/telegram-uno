@@ -258,7 +258,6 @@ if __name__ == "__main__":
     updater = Updater(API_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
-    # omit 'play'
     chosen_card_filter = Filters.regex('^(red|green|blue|yellow) \d$')
     chosen_special_card_filter = Filters.regex('^(red|green|blue|yellow) (\+2|skip|reverse)$')
     chosen_wild_card_filter = Filters.regex('^special (\+4|change color)$')
